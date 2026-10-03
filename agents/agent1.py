@@ -25,7 +25,7 @@ class Agent1:
         return game.agent1, game.agent2, frozenset(game.boxes)
 
     def blocked(self, position, game):
-        if hasattr(game, 'inside') and not game.inside(position):
+        if not game.inside(position):
             return True
 
         return position in game.walls
@@ -39,20 +39,16 @@ class Agent1:
 
             while queue:
                 box = queue.popleft()
-                distance = distances[box]
 
                 for dr, dc in self.DIRECTIONS.values():
                     old_box = (box[0] - dr, box[1] - dc)
                     old_agent = (box[0] - 2 * dr, box[1] - 2 * dc)
 
-                    if self.blocked(old_box, game):
-                        continue
-
-                    if self.blocked(old_agent, game):
+                    if self.blocked(old_box, game) or self.blocked(old_agent, game):
                         continue
 
                     if old_box not in distances:
-                        distances[old_box] = distance + 1
+                        distances[old_box] = distances[box] + 1
                         queue.append(old_box)
 
             self.goal_distances[goal] = distances
@@ -60,33 +56,30 @@ class Agent1:
     def box_goal_distance(self, box):
         distances = []
 
-        for values in self.goal_distances.values():
-            if box in values:
-                distances.append(values[box])
+        for goal_distances in self.goal_distances.values():
+            if box in goal_distances:
+                distances.append(goal_distances[box])
 
-        return min(distances) if distances else 1000
+        if distances:
+            return min(distances)
+
+        return 1000
 
     def bfs_distance(self, start, target, game):
-        if start == target:
-            return 0
-
         queue = deque([(start, 0)])
         visited = {start}
 
         while queue:
             position, distance = queue.popleft()
 
+            if position == target:
+                return distance
+
             for dr, dc in self.DIRECTIONS.values():
                 new_position = (position[0] + dr, position[1] + dc)
 
-                if self.blocked(new_position, game):
+                if self.blocked(new_position, game) or new_position in visited:
                     continue
-
-                if new_position in visited:
-                    continue
-
-                if new_position == target:
-                    return distance + 1
 
                 visited.add(new_position)
                 queue.append((new_position, distance + 1))
@@ -97,13 +90,11 @@ class Agent1:
         agent1, agent2, boxes = state
         actions = []
 
-        for action, (dr, dc) in self.DIRECTIONS.items():
+        for action, direction in self.DIRECTIONS.items():
+            dr, dc = direction
             new_agent = (agent1[0] + dr, agent1[1] + dc)
 
-            if self.blocked(new_agent, game):
-                continue
-
-            if new_agent == agent2:
+            if self.blocked(new_agent, game) or new_agent == agent2:
                 continue
 
             if new_agent in boxes:
@@ -136,22 +127,22 @@ class Agent1:
     def evaluate(self, state, game):
         agent1, agent2, boxes = state
         score = 0
-        unfinished = []
+        unfinished_boxes = []
 
         for box in boxes:
             if box in game.destinations:
                 score += 1000
             else:
-                unfinished.append(box)
+                unfinished_boxes.append(box)
 
-        for box in unfinished:
+        for box in unfinished_boxes:
             distance = self.box_goal_distance(box)
             score -= distance * 10
 
-        if unfinished:
+        if unfinished_boxes:
             distances = []
 
-            for box in unfinished:
+            for box in unfinished_boxes:
                 distance = self.bfs_distance(agent1, box, game)
                 distances.append(distance)
 
@@ -168,28 +159,28 @@ class Agent1:
         if game.last_conflict and game.last_action1 in actions:
             actions.remove(game.last_action1)
 
-        fresh = []
+        fresh_actions = []
 
         for action in actions:
             new_state = self.move(state, action)
             new_position = new_state[0]
 
             if new_position not in self.recent_positions:
-                fresh.append(action)
+                fresh_actions.append(action)
 
-        if fresh:
-            return fresh
+        if fresh_actions:
+            return fresh_actions
 
         return actions
 
     def search(self, game):
         start_time = time.perf_counter()
-        start = self.get_state(game)
+        start_state = self.get_state(game)
+        start_score = self.evaluate(start_state, game)
 
-        start_score = self.evaluate(start, game)
-        queue = [(-start_score, 0, start, [])]
-
+        queue = [(-start_score, 0, start_state, [])]
         visited = set()
+
         best_path = []
         best_score = -float('inf')
         counter = 0
@@ -198,7 +189,9 @@ class Agent1:
             if time.perf_counter() - start_time >= self.DECISION_LIMIT:
                 break
 
-            _, _, state, path = heapq.heappop(queue)
+            item = heapq.heappop(queue)
+            state = item[2]
+            path = item[3]
 
             if state in visited:
                 continue
@@ -226,17 +219,15 @@ class Agent1:
                     continue
 
                 new_score = self.evaluate(new_state, game)
-
                 counter += 1
-                heapq.heappush(
-                    queue,
-                    (-new_score, counter, new_state, path + [action])
-                )
+
+                new_item = (-new_score, counter, new_state, path + [action])
+                heapq.heappush(queue, new_item)
 
         if best_path:
             return best_path[0]
 
-        actions = self.root_actions(start, game)
+        actions = self.root_actions(start_state, game)
 
         if not actions:
             return 'Stay'
@@ -245,7 +236,7 @@ class Agent1:
         best_score = -float('inf')
 
         for action in actions:
-            new_state = self.move(start, action)
+            new_state = self.move(start_state, action)
             score = self.evaluate(new_state, game)
 
             if score > best_score:

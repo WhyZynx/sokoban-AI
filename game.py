@@ -9,10 +9,8 @@ DIRECTIONS = {
 class Game:
     def __init__(self, sokoban):
         self.sokoban = sokoban
-
         self.agent = sokoban.initial[0]
         self.boxes = set(sokoban.initial[1])
-
         self.actions = []
         self.current_step = 0
         self.history = []
@@ -45,7 +43,6 @@ class Game:
 
         self.history.append((old_agent, old_boxes))
         self.agent = new_agent
-
         return True
 
     def forward(self):
@@ -69,7 +66,6 @@ class Game:
     def reset(self):
         self.agent = self.sokoban.initial[0]
         self.boxes = set(self.sokoban.initial[1])
-
         self.current_step = 0
         self.history = []
 

@@ -1,5 +1,3 @@
-import sys
-import time
 import heapq
 
 from collections import deque
@@ -188,34 +186,3 @@ def search(game, use_astar=False):
                 )
 
     return None, None, expanded
-
-
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        path = sys.argv[1]
-    else:
-        path = 'maps/example_map.txt'
-
-    game = Sokoban(path)
-
-    for name, use_astar in [
-        ('UCS', False),
-        ('A*', True)
-    ]:
-        start = time.time()
-
-        actions, cost, expanded = search(game, use_astar)
-
-        elapsed = time.time() - start
-
-        print()
-        print('===', name, '===')
-
-        if actions is None:
-            print('No solution')
-        else:
-            print('Actions:', actions)
-            print('Total cost:', cost)
-
-        print('Expanded:', expanded)
-        print('Time:', f'{elapsed:.4f}s')

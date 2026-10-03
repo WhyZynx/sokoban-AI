@@ -259,13 +259,3 @@ class CompetitiveGame:
             return 'Agent 2'
 
         return 'Draw'
-
-    def show_state(self):
-        score1, score2 = self.get_score()
-
-        print('Step:', self.current_step)
-        print('Agent 1:', self.agent1)
-        print('Agent 2:', self.agent2)
-        print('Boxes:', self.boxes)
-        print('Score:', score1, '-', score2)
-        print('Conflict:', self.last_conflict)

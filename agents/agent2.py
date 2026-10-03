@@ -24,32 +24,26 @@ class Agent2:
         return game.agent1, game.agent2, frozenset(game.boxes)
 
     def blocked(self, position, game):
-        if hasattr(game, 'inside') and not game.inside(position):
+        if not game.inside(position):
             return True
 
         return position in game.walls
 
     def bfs_distance(self, start, target, game):
-        if start == target:
-            return 0
-
         queue = deque([(start, 0)])
         visited = {start}
 
         while queue:
             position, distance = queue.popleft()
 
+            if position == target:
+                return distance
+
             for dr, dc in self.DIRECTIONS.values():
                 new_position = (position[0] + dr, position[1] + dc)
 
-                if self.blocked(new_position, game):
+                if self.blocked(new_position, game) or new_position in visited:
                     continue
-
-                if new_position in visited:
-                    continue
-
-                if new_position == target:
-                    return distance + 1
 
                 visited.add(new_position)
                 queue.append((new_position, distance + 1))
@@ -60,13 +54,11 @@ class Agent2:
         agent1, agent2, boxes = state
         actions = []
 
-        for action, (dr, dc) in self.DIRECTIONS.items():
+        for action, direction in self.DIRECTIONS.items():
+            dr, dc = direction
             new_agent = (agent2[0] + dr, agent2[1] + dc)
 
-            if self.blocked(new_agent, game):
-                continue
-
-            if new_agent == agent1:
+            if self.blocked(new_agent, game) or new_agent == agent1:
                 continue
 
             if new_agent in boxes:
@@ -98,18 +90,18 @@ class Agent2:
 
     def heuristic(self, state, game):
         agent1, agent2, boxes = state
-        unfinished = []
+        unfinished_boxes = []
 
         for box in boxes:
             if box not in game.destinations:
-                unfinished.append(box)
+                unfinished_boxes.append(box)
 
-        if not unfinished:
+        if not unfinished_boxes:
             return 0
 
         box_cost = 0
 
-        for box in unfinished:
+        for box in unfinished_boxes:
             distances = []
 
             for goal in game.destinations:
@@ -121,17 +113,20 @@ class Agent2:
 
         agent_cost = 1000
 
-        for box in unfinished:
+        for box in unfinished_boxes:
             distance = self.bfs_distance(agent2, box, game)
             agent_cost = min(agent_cost, distance)
 
-        completed = len(boxes) - len(unfinished)
-        value = box_cost * 5 + agent_cost - completed * 20
+        completed_boxes = len(boxes) - len(unfinished_boxes)
+
+        heuristic_value = box_cost * 5
+        heuristic_value += agent_cost
+        heuristic_value -= completed_boxes * 20
 
         if agent2 in self.recent_positions:
-            value += 200
+            heuristic_value += 200
 
-        return value
+        return heuristic_value
 
     def root_actions(self, state, game):
         actions = self.get_valid_actions(state, game)
@@ -139,28 +134,28 @@ class Agent2:
         if game.last_conflict and game.last_action2 in actions:
             actions.remove(game.last_action2)
 
-        fresh = []
+        fresh_actions = []
 
         for action in actions:
             new_state = self.move(state, action)
             new_position = new_state[1]
 
             if new_position not in self.recent_positions:
-                fresh.append(action)
+                fresh_actions.append(action)
 
-        if fresh:
-            return fresh
+        if fresh_actions:
+            return fresh_actions
 
         return actions
 
     def search(self, game):
         start_time = time.perf_counter()
-        start = self.get_state(game)
+        start_state = self.get_state(game)
 
-        start_h = self.heuristic(start, game)
-        queue = [(start_h, 0, 0, start, [])]
+        start_h = self.heuristic(start_state, game)
+        queue = [(start_h, 0, 0, start_state, [])]
 
-        best_cost = {start: 0}
+        best_cost = {start_state: 0}
         best_path = []
         best_h = float('inf')
         counter = 0
@@ -169,7 +164,11 @@ class Agent2:
             if time.perf_counter() - start_time >= self.DECISION_LIMIT:
                 break
 
-            _, _, cost, state, path = heapq.heappop(queue)
+            item = heapq.heappop(queue)
+
+            cost = item[2]
+            state = item[3]
+            path = item[4]
 
             if cost > best_cost.get(state, float('inf')):
                 continue
@@ -196,25 +195,25 @@ class Agent2:
                     continue
 
                 new_h = self.heuristic(new_state, game)
+                priority = new_cost + new_h
 
                 best_cost[new_state] = new_cost
                 counter += 1
 
-                heapq.heappush(
-                    queue,
-                    (
-                        new_cost + new_h,
-                        counter,
-                        new_cost,
-                        new_state,
-                        path + [action]
-                    )
+                new_item = (
+                    priority,
+                    counter,
+                    new_cost,
+                    new_state,
+                    path + [action]
                 )
+
+                heapq.heappush(queue, new_item)
 
         if best_path:
             return best_path[0]
 
-        actions = self.root_actions(start, game)
+        actions = self.root_actions(start_state, game)
 
         if not actions:
             return 'Stay'
@@ -223,7 +222,7 @@ class Agent2:
         best_h = float('inf')
 
         for action in actions:
-            new_state = self.move(start, action)
+            new_state = self.move(start_state, action)
             h = self.heuristic(new_state, game)
 
             if h < best_h:
