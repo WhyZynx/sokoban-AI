@@ -1,3 +1,4 @@
+import os
 import pygame
 
 from sokoban import search
@@ -8,240 +9,168 @@ class GUI:
         pygame.init()
 
         self.game = game
-        self.algorithm = 'UCS'
-        self.paused = True
-
         self.cell = 64
         self.margin = 32
+        self.algorithm = 'UCS'
+        self.paused = True
+        self.direction = 'South'
+        self.last_move = 0
 
-        self.board_width = self.game.sokoban.width * self.cell
-        self.panel_x = self.board_width + 80
+        board_w = game.sokoban.width * self.cell
+        board_h = game.sokoban.height * self.cell
 
-        width = self.panel_x + 250
-        height = max(self.game.sokoban.height * self.cell + 64, 490)
+        self.panel_x = self.margin + board_w + 45
+        width = self.panel_x + 230
+        height = max(board_h + self.margin * 2, 490)
 
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption('Sokoban Solver')
 
         self.font = pygame.font.SysFont('Arial', 18)
-        self.small_font = pygame.font.SysFont('Arial', 15)
-        self.title_font = pygame.font.SysFont('Arial', 27, bold=True)
+        self.small = pygame.font.SysFont('Arial', 15)
+        self.title = pygame.font.SysFont('Arial', 27, bold=True)
         self.clock = pygame.time.Clock()
 
-        button_width = 85
-        button_gap = 15
+        self.grass = self.load('grass.png')
+        self.wall = self.load('wall.png')
+        self.goal = self.load('goal.png', 36)
+        self.box = self.load('box.png')
+        self.box_goal = self.load('brown_box.png')
 
-        self.ucs_button = pygame.Rect(self.panel_x, 105, button_width, 42)
-        self.astar_button = pygame.Rect(self.panel_x + button_width + button_gap, 105, button_width, 42)
-        self.back_button = pygame.Rect(self.panel_x, 380, 185, 38)
+        self.duck = {
+            'North': self.load('duck_back.png', 68),
+            'South': self.load('duck_front.png', 68),
+            'West': self.load('duck_left.png', 68),
+            'East': self.load('duck_right.png', 68)
+        }
 
-        self.last_move = 0
+        self.ucs = pygame.Rect(self.panel_x, 105, 85, 42)
+        self.astar = pygame.Rect(self.panel_x + 100, 105, 85, 42)
+        self.back = pygame.Rect(self.panel_x, 380, 185, 38)
+
         self.solve('UCS')
+
+    def load(self, name, size=64):
+        path = os.path.join('assets', name)
+        image = pygame.image.load(path).convert_alpha()
+        return pygame.transform.scale(image, (size, size))
 
     def solve(self, algorithm):
         self.algorithm = algorithm
         self.paused = True
-
-        actions, _, _ = search(self.game.sokoban, algorithm == 'A*')
+        actions, cost, expanded = search(self.game.sokoban, algorithm == 'A*')
         self.game.set_actions(actions)
+        self.direction = 'South'
 
-    def draw_floor(self, rect):
-        pygame.draw.rect(self.screen, (244, 230, 195), rect)
-        pygame.draw.line(self.screen, (235, 216, 176), (rect.left + 8, rect.top + 15), (rect.left + 18, rect.top + 15), 2)
-        pygame.draw.line(self.screen, (235, 216, 176), (rect.right - 20, rect.bottom - 15), (rect.right - 10, rect.bottom - 15), 2)
+    def forward(self):
+        if self.game.current_step < len(self.game.actions):
+            self.direction = self.game.actions[self.game.current_step]
+            self.game.forward()
 
-    def draw_wall(self, rect):
-        base = (151, 143, 87)
-        line = (92, 87, 57)
+    def backward(self):
+        self.game.backward()
 
-        pygame.draw.rect(self.screen, base, rect)
-
-        h = self.cell // 3
-        left = rect.left + 1
-        right = rect.right - 1
-        top = rect.top + 1
-        bottom = rect.bottom - 1
-
-        pygame.draw.line(self.screen, line, (left, rect.top + h), (right, rect.top + h), 2)
-        pygame.draw.line(self.screen, line, (left, rect.top + h * 2), (right, rect.top + h * 2), 2)
-        pygame.draw.line(self.screen, line, (rect.centerx, top), (rect.centerx, rect.top + h), 2)
-        pygame.draw.line(self.screen, line, (rect.left + self.cell // 4, rect.top + h), (rect.left + self.cell // 4, rect.top + h * 2), 2)
-        pygame.draw.line(self.screen, line, (rect.centerx, rect.top + h * 2), (rect.centerx, bottom), 2)
-        pygame.draw.rect(self.screen, line, rect, 2)
-
-    def draw_goal(self, rect):
-        pygame.draw.circle(self.screen, (218, 142, 132), rect.center, 12)
-        pygame.draw.circle(self.screen, (235, 174, 160), rect.center, 7)
-
-    def draw_box(self, rect, completed=False):
-        x = rect.left
-        y = rect.top
-        s = self.cell // 8
-
-        if completed:
-            box = (151, 91, 47)
-            top = (176, 111, 57)
-            border = (92, 57, 34)
-            tape = (205, 155, 94)
+        if self.game.current_step > 0:
+            self.direction = self.game.actions[self.game.current_step - 1]
         else:
-            box = (211, 151, 81)
-            top = (230, 174, 101)
-            border = (125, 81, 44)
-            tape = (242, 207, 145)
-
-        pygame.draw.rect(self.screen, border, (x + s, y + s, s * 6, s * 6))
-        pygame.draw.rect(self.screen, box, (x + s + 3, y + s + 3, s * 6 - 6, s * 6 - 6))
-        pygame.draw.rect(self.screen, top, (x + s + 3, y + s + 3, s * 6 - 6, s * 2))
-        pygame.draw.rect(self.screen, tape, (x + s * 3, y + s + 3, s * 2, s * 6 - 6))
-
-    def draw_agent(self, rect):
-        x = rect.left
-        y = rect.top
-        s = self.cell // 8
-
-        orange = (242, 158, 69)
-        light = (255, 181, 91)
-        shadow = (218, 122, 42)
-        cream = (255, 239, 205)
-        dark = (67, 55, 45)
-        collar = (181, 59, 77)
-
-        pygame.draw.rect(self.screen, orange, (x + s * 2, y + s * 4, s * 4, s * 3))
-
-        pygame.draw.rect(self.screen, light, (x + s * 2, y + s, s * 4, s * 4))
-        pygame.draw.rect(self.screen, light, (x + s * 2, y, s, s * 2))
-        pygame.draw.rect(self.screen, light, (x + s * 5, y, s, s * 2))
-
-        pygame.draw.rect(self.screen, shadow, (x + s * 2, y, s, s))
-        pygame.draw.rect(self.screen, shadow, (x + s * 5, y, s, s))
-
-        pygame.draw.rect(self.screen, cream, (x + s * 2, y + s * 3, s * 4, s))
-
-        pygame.draw.rect(self.screen, dark, (x + s * 3, y + s * 2, s, s))
-        pygame.draw.rect(self.screen, dark, (x + s * 5, y + s * 2, s, s))
-
-        pygame.draw.rect(self.screen, collar, (x + s * 2, y + s * 4, s * 4, s // 2))
-
-        pygame.draw.rect(self.screen, orange, (x + s * 6, y + s * 4, s, s * 3))
-        pygame.draw.rect(self.screen, orange, (x + s * 7, y + s * 3, s, s * 2))
-        pygame.draw.rect(self.screen, shadow, (x + s * 7, y + s * 3, s, s))
+            self.direction = 'South'
 
     def draw_board(self):
-        sokoban = self.game.sokoban
+        s = self.game.sokoban
 
-        for row in range(sokoban.height):
-            wall_cols = [col for col in range(sokoban.width) if (row, col) in sokoban.walls]
+        for row in range(s.height):
+            walls = [col for col in range(s.width) if (row, col) in s.walls]
 
-            if not wall_cols:
+            if not walls:
                 continue
 
-            left = min(wall_cols)
-            right = max(wall_cols)
+            for col in range(min(walls), max(walls) + 1):
+                pos = (row, col)
+                x = self.margin + col * self.cell
+                y = self.margin + row * self.cell
 
-            for col in range(left, right + 1):
-                position = (row, col)
-                rect = pygame.Rect(self.margin + col * self.cell, self.margin + row * self.cell, self.cell, self.cell)
+                if pos in s.walls:
+                    self.screen.blit(self.wall, (x, y))
+                else:
+                    self.screen.blit(self.grass, (x, y))
 
-                if position in sokoban.walls:
-                    self.draw_wall(rect)
-                    continue
+                    if pos in s.goals:
+                        self.screen.blit(self.goal, (x + 14, y + 14))
 
-                self.draw_floor(rect)
+                    if pos in self.game.boxes:
+                        image = self.box_goal if pos in s.goals else self.box
+                        self.screen.blit(image, (x, y))
 
-                if position in sokoban.goals:
-                    self.draw_goal(rect)
+        row, col = self.game.agent
+        x = self.margin + col * self.cell
+        y = self.margin + row * self.cell
+        self.screen.blit(self.duck[self.direction], (x - 2, y - 7))
 
-                if position in self.game.boxes:
-                    self.draw_box(rect, position in sokoban.goals)
-
-                if position == self.game.agent:
-                    self.draw_agent(rect)
-
-    def draw_button(self, rect, text, selected=False):
+    def button(self, rect, text, selected=False):
         hover = rect.collidepoint(pygame.mouse.get_pos())
 
         if selected or hover:
-            color = (128, 96, 65)
-            text_color = (255, 250, 235)
+            color = (86, 157, 164)
+            text_color = (255, 255, 255)
         else:
-            color = (218, 201, 166)
-            text_color = (91, 75, 57)
+            color = (213, 235, 234)
+            text_color = (45, 82, 87)
 
-        pygame.draw.rect(self.screen, color, rect, border_radius=7)
-        pygame.draw.rect(self.screen, (137, 113, 81), rect, 2, border_radius=7)
+        pygame.draw.rect(self.screen, color, rect, border_radius=8)
+        pygame.draw.rect(self.screen, (160, 202, 201), rect, 2, border_radius=8)
 
-        text_surface = self.font.render(text, True, text_color)
-        self.screen.blit(text_surface, text_surface.get_rect(center=rect.center))
+        label = self.font.render(text, True, text_color)
+        self.screen.blit(label, label.get_rect(center=rect.center))
 
     def draw_panel(self):
         x = self.panel_x
         panel = pygame.Rect(x - 20, 30, 220, 430)
 
-        pygame.draw.rect(self.screen, (247, 238, 216), panel, border_radius=12)
-        pygame.draw.rect(self.screen, (186, 164, 124), panel, 2, border_radius=12)
+        pygame.draw.rect(self.screen, (248, 252, 250), panel, border_radius=14)
+        pygame.draw.rect(self.screen, (160, 202, 201), panel, 2, border_radius=14)
 
-        title = self.title_font.render('Sokoban', True, (75, 61, 47))
-        self.screen.blit(title, (x, 50))
+        self.screen.blit(self.title.render('Sokoban', True, (45, 82, 87)), (x, 50))
+        self.screen.blit(self.small.render('ALGORITHM', True, (103, 139, 141)), (x, 83))
 
-        label = self.small_font.render('ALGORITHM', True, (139, 116, 83))
-        self.screen.blit(label, (x, 83))
+        self.button(self.ucs, 'UCS', self.algorithm == 'UCS')
+        self.button(self.astar, 'A*', self.algorithm == 'A*')
 
-        self.draw_button(self.ucs_button, 'UCS', self.algorithm == 'UCS')
-        self.draw_button(self.astar_button, 'A*', self.algorithm == 'A*')
+        self.screen.blit(self.font.render('Actions', True, (103, 139, 141)), (x, 180))
 
-        actions = self.font.render('Actions', True, (112, 91, 65))
-        actions_value = self.title_font.render(f'{self.game.current_step}/{len(self.game.actions)}', True, (75, 61, 47))
+        count = f'{self.game.current_step}/{len(self.game.actions)}'
+        self.screen.blit(self.title.render(count, True, (45, 82, 87)), (x, 205))
 
-        self.screen.blit(actions, (x, 180))
-        self.screen.blit(actions_value, (x, 205))
+        controls = [('SPACE', 'Play / Pause'), ('RIGHT', 'Forward'), ('LEFT', 'Backward')]
 
-        pygame.draw.line(self.screen, (211, 193, 157), (x, 250), (x + 180, 250), 1)
+        for i, (key, text) in enumerate(controls):
+            y = 270 + i * 26
+            self.screen.blit(self.small.render(key, True, (45, 82, 87)), (x, y))
+            self.screen.blit(self.small.render(text, True, (103, 139, 141)), (x + 70, y))
 
-        controls = [
-            ('SPACE', 'Play / Pause'),
-            ('RIGHT', 'Forward'),
-            ('LEFT', 'Backward')
-        ]
-
-        y = 270
-
-        for key, action in controls:
-            key_text = self.small_font.render(key, True, (94, 74, 55))
-            action_text = self.small_font.render(action, True, (139, 116, 83))
-
-            self.screen.blit(key_text, (x, y))
-            self.screen.blit(action_text, (x + 70, y))
-            y += 26
-
-        self.draw_button(self.back_button, 'Back to Menu')
+        self.button(self.back, 'Back to Menu')
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 self.paused = not self.paused
-
             elif event.key == pygame.K_RIGHT:
                 self.paused = True
-                self.game.forward()
-
+                self.forward()
             elif event.key == pygame.K_LEFT:
                 self.paused = True
-                self.game.backward()
-
+                self.backward()
             elif event.key == pygame.K_ESCAPE:
-                return 'back'
+                return True
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.ucs_button.collidepoint(event.pos):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.ucs.collidepoint(event.pos):
                 self.solve('UCS')
-
-            elif self.astar_button.collidepoint(event.pos):
+            elif self.astar.collidepoint(event.pos):
                 self.solve('A*')
+            elif self.back.collidepoint(event.pos):
+                return True
 
-            elif self.back_button.collidepoint(event.pos):
-                return 'back'
-
-        return None
+        return False
 
     def update(self):
         if self.paused:
@@ -250,12 +179,11 @@ class GUI:
         now = pygame.time.get_ticks()
 
         if now - self.last_move >= 500:
-            if self.game.current_step < len(self.game.actions):
-                self.game.forward()
-            else:
-                self.paused = True
-
+            self.forward()
             self.last_move = now
+
+            if self.game.current_step >= len(self.game.actions):
+                self.paused = True
 
     def run(self):
         while True:
@@ -263,12 +191,12 @@ class GUI:
                 if event.type == pygame.QUIT:
                     return
 
-                if self.handle_event(event) == 'back':
+                if self.handle_event(event):
                     return
 
             self.update()
 
-            self.screen.fill((226, 215, 185))
+            self.screen.fill((225, 242, 240))
             self.draw_board()
             self.draw_panel()
 

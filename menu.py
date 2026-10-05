@@ -2,16 +2,16 @@ import pygame
 
 
 class Menu:
-    BG = (226, 215, 185)
-    PANEL = (247, 238, 216)
-    BUTTON = (218, 201, 166)
-    HOVER = (128, 96, 65)
-    BORDER = (137, 113, 81)
-    TITLE = (75, 61, 47)
-    TEXT = (91, 75, 57)
-    MUTED = (139, 116, 83)
-    WHITE = (255, 250, 235)
-    ERROR = (160, 80, 70)
+    BG = (225, 242, 240)
+    PANEL = (248, 252, 250)
+    BUTTON = (213, 235, 234)
+    HOVER = (86, 157, 164)
+    BORDER = (160, 202, 201)
+    TITLE = (45, 82, 87)
+    TEXT = (45, 82, 87)
+    MUTED = (103, 139, 141)
+    WHITE = (255, 255, 255)
+    ERROR = (190, 90, 90)
 
     def __init__(self):
         pygame.init()
