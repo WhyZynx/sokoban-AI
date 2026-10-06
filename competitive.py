@@ -42,17 +42,7 @@ def load_competitive_map(path):
 
 
 class CompetitiveGame:
-    def __init__(
-        self,
-        walls,
-        boxes,
-        destinations,
-        agent1,
-        agent2,
-        max_steps,
-        height=None,
-        width=None
-    ):
+    def __init__(self, walls, boxes, destinations, agent1, agent2, max_steps, height=None, width=None):
         self.walls = set(walls)
         self.boxes = set(boxes)
         self.destinations = set(destinations)
@@ -72,12 +62,16 @@ class CompetitiveGame:
         self.last_action1 = None
         self.last_action2 = None
 
+        self.direction1 = 'South'
+        self.direction2 = 'South'
+
+        self.history = []
+
     def inside(self, position):
         if self.height is None or self.width is None:
             return True
 
         row, col = position
-
         return 0 <= row < self.height and 0 <= col < self.width
 
     def blocked(self, position):
@@ -167,11 +161,30 @@ class CompetitiveGame:
         if self.is_finished():
             return
 
+        state = (
+            self.agent1,
+            self.agent2,
+            set(self.boxes),
+            dict(self.box_owner),
+            self.current_step,
+            self.last_conflict,
+            self.last_action1,
+            self.last_action2,
+            self.direction1,
+            self.direction2
+        )
+
         if action1 not in DIRECTIONS:
             action1 = 'Stay'
 
         if action2 not in DIRECTIONS:
             action2 = 'Stay'
+
+        if action1 != 'Stay':
+            self.direction1 = action1
+
+        if action2 != 'Stay':
+            self.direction2 = action2
 
         move1 = self.get_intent(self.agent1, action1)
         move2 = self.get_intent(self.agent2, action2)
@@ -191,6 +204,8 @@ class CompetitiveGame:
             self.last_action2 = None
 
         self.apply_moves(move1, move2)
+
+        self.history.append(state)
         self.current_step += 1
 
     def apply_moves(self, move1, move2):
@@ -227,6 +242,21 @@ class CompetitiveGame:
 
         if new_box in self.destinations:
             self.box_owner[new_box] = player
+
+    def backward(self):
+        if self.history:
+            state = self.history.pop()
+
+            self.agent1 = state[0]
+            self.agent2 = state[1]
+            self.boxes = state[2]
+            self.box_owner = state[3]
+            self.current_step = state[4]
+            self.last_conflict = state[5]
+            self.last_action1 = state[6]
+            self.last_action2 = state[7]
+            self.direction1 = state[8]
+            self.direction2 = state[9]
 
     def get_score(self):
         score1 = 0

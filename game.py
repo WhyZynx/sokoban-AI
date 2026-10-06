@@ -29,9 +29,6 @@ class Game:
         if self.sokoban.is_wall(new_agent):
             return False
 
-        old_agent = self.agent
-        old_boxes = set(self.boxes)
-
         if new_agent in self.boxes:
             new_box = (new_agent[0] + dr, new_agent[1] + dc)
 
@@ -41,7 +38,6 @@ class Game:
             self.boxes.remove(new_agent)
             self.boxes.add(new_box)
 
-        self.history.append((old_agent, old_boxes))
         self.agent = new_agent
         return True
 
@@ -49,19 +45,16 @@ class Game:
         if self.current_step >= len(self.actions):
             return
 
+        state = (self.agent, set(self.boxes), self.current_step)
         action = self.actions[self.current_step]
 
         if self.move(action):
+            self.history.append(state)
             self.current_step += 1
 
     def backward(self):
-        if not self.history:
-            return
-
-        self.agent, self.boxes = self.history.pop()
-
-        if self.current_step > 0:
-            self.current_step -= 1
+        if self.history:
+            self.agent, self.boxes, self.current_step = self.history.pop()
 
     def reset(self):
         self.agent = self.sokoban.initial[0]

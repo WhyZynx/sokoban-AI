@@ -40,7 +40,20 @@ Analyze the proposed heuristic and verify two important properties:
 - **Admissibility:** the heuristic does not overestimate the optimal remaining cost.
 - **Consistency:** the heuristic satisfies the consistency condition between neighboring states.
 
-Experiments are also performed to support the analysis.
+#### Heuristic properties and experiment
+
+For each box, the heuristic finds the minimum number of pushes to any goal using wall-aware reverse-push distances, then adds these values for all boxes. It ignores the player's walking distance and treats boxes independently.
+
+- **Admissible:** every solution must push each box at least its individual minimum number of times. The sum is therefore no greater than the total solution cost; ignored walking and interactions can only make the estimate smaller.
+- **Consistent:** a normal player move does not change the heuristic. A push moves one box by one step in the push-distance graph, so its distance can decrease by at most one. Since every action costs 1, `h(s) <= 1 + h(s')` for every transition.
+
+`verify_heuristic.py` exhaustively explores the reachable state graph for `maps/map2.txt`, calculates exact costs-to-go by reverse shortest-path search, and checks admissibility on every solvable state and consistency on every transition. The graph must be complete for the experiment to report a pass.
+
+| Map | Reachable states | Solvable states checked | Transitions checked | Admissibility violations | Consistency violations | Result |
+|---|---:|---:|---:|---:|---:|---|
+| `map2.txt` | 380 (complete) | 114 | 1,160 | 0 | 0 | Passed |
+
+Reproduce the experiment with `python3 verify_heuristic.py`. These results support the properties on the tested map; the argument above explains why they hold for the heuristic generally.
 
 ### Req 5 – Pygame Visualization
 

@@ -3,9 +3,9 @@ import pygame
 
 from sokoban import Sokoban
 from game import Game
-from gui import GUI
+from gui.single import GUI
+from gui.competitive import CompetitiveGUI
 from competitive import CompetitiveGame, load_competitive_map
-from competitive_gui import CompetitiveGUI
 from agents.agent1 import Agent1
 from agents.agent2 import Agent2
 from menu import Menu
