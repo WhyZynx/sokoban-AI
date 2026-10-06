@@ -1,3 +1,5 @@
+import sys
+import time
 import heapq
 
 from collections import deque
@@ -112,21 +114,22 @@ class Sokoban:
                     queue.append(previous_box)
 
     def heuristic(self, state):
-        agent, boxes = state
+        if isinstance(state, tuple):
+            agent, boxes = state[0], state[1]
+        else:
+            agent, boxes = state
         total = 0
-
         for box in boxes:
             distance = self.distances.get(box, INF)
 
             if distance == INF:
                 return INF
-
             total += distance
 
         return total
 
 
-def search(game, use_astar=False):
+def search(game, use_astar=False, return_all=False):
     start = game.initial
 
     if use_astar:
@@ -144,14 +147,18 @@ def search(game, use_astar=False):
     parent = {start: None}
 
     expanded = 0
+    max_frontier = 0 
+    visited_states = [] 
 
     while queue:
+        max_frontier = max(max_frontier, len(queue))
         priority, _, cost, state = heapq.heappop(queue)
 
         if cost > best_cost.get(state, INF):
             continue
 
         expanded += 1
+        visited_states.append(state)
 
         if game.is_goal(state):
             actions = []
@@ -163,6 +170,8 @@ def search(game, use_astar=False):
 
             actions.reverse()
 
+            if return_all:
+                return actions, cost, expanded, max_frontier, visited_states
             return actions, cost, expanded
 
         for action, new_state, move_cost in game.actions(state):
@@ -185,4 +194,36 @@ def search(game, use_astar=False):
                     (new_cost + h, next(order), new_cost, new_state)
                 )
 
+    if return_all:
+        return None, None, expanded, max_frontier, visited_states
     return None, None, expanded
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+    else:
+        path = 'maps/example_map.txt'
+
+    game = Sokoban(path)
+
+    for name, use_astar in [
+        ('UCS', False),
+        ('A*', True)
+    ]:
+        start = time.time()
+        actions, cost, expanded= search(game, use_astar)
+
+        elapsed = time.time() - start
+
+        print()
+        print('===', name, '===')
+
+        if actions is None:
+            print('No solution')
+        else:
+            print('Actions:', actions)
+            print('Total cost:', cost)
+
+        print('Expanded:', expanded)
+        print('Time:', f'{elapsed:.4f}s')
